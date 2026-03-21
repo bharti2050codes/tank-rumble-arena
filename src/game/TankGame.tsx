@@ -470,6 +470,7 @@ export default function TankGame() {
     // tanks
     drawTank(ctx, S.player);
     drawTank(ctx, S.ai);
+    ctx.restore();
   }
 
   function drawTank(ctx: CanvasRenderingContext2D, t: Tank) {
