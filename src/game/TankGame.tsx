@@ -84,12 +84,53 @@ function initState(): GameState {
 }
 
 // ── Component ──────────────────────────────────────────────────────────
+// ── Confetti ───────────────────────────────────────────────────────────
+function Confetti() {
+  const pieces = useRef(
+    Array.from({ length: 60 }, () => ({
+      x: Math.random() * 100,
+      delay: Math.random() * 2,
+      duration: 1.5 + Math.random() * 2,
+      color: ["#e8c44a", "#4a8", "#c44", "#48f", "#f4a", "#fa4"][Math.floor(Math.random() * 6)],
+      size: 4 + Math.random() * 6,
+      drift: (Math.random() - 0.5) * 40,
+    }))
+  ).current;
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {pieces.map((p, i) => (
+        <div
+          key={i}
+          className="absolute rounded-sm"
+          style={{
+            left: `${p.x}%`,
+            top: "-10px",
+            width: p.size,
+            height: p.size * 1.4,
+            background: p.color,
+            animation: `confetti-fall ${p.duration}s ${p.delay}s ease-in forwards`,
+          }}
+        />
+      ))}
+      <style>{`
+        @keyframes confetti-fall {
+          0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(700px) rotate(720deg); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ── Component ──────────────────────────────────────────────────────────
 export default function TankGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<GameState>(initState());
   const keysRef = useRef<Set<string>>(new Set());
   const mouseRef = useRef<Vec2>({ x: CANVAS_W / 2, y: CANVAS_H / 2 });
   const mouseDownRef = useRef(false);
+  const hasFiredRef = useRef(false);
   const rafRef = useRef<number>(0);
   const [score, setScore] = useState(0);
   const [playerHp, setPlayerHp] = useState(100);
@@ -99,6 +140,7 @@ export default function TankGame() {
 
   const restart = useCallback(() => {
     stateRef.current = initState();
+    hasFiredRef.current = false;
     setScore(0); setPlayerHp(100); setAiHp(100);
     setGameOver(false); setWinner("");
   }, []);
@@ -204,6 +246,7 @@ export default function TankGame() {
     p.cooldown = Math.max(0, p.cooldown - 1);
 
     if ((mouseDownRef.current || k.has(" ")) && p.cooldown === 0) {
+      hasFiredRef.current = true;
       fireBullet(S, p, "player");
       p.cooldown = p.maxCooldown;
     }
@@ -257,7 +300,7 @@ export default function TankGame() {
     }
 
     ai.cooldown = Math.max(0, ai.cooldown - 1);
-    if (ai.cooldown === 0 && d < 500) {
+    if (ai.cooldown === 0 && d < 500 && hasFiredRef.current) {
       // check line of sight
       if (hasLineOfSight(ai.pos, p.pos, S.obstacles)) {
         fireBullet(S, ai, "ai");
@@ -546,12 +589,13 @@ export default function TankGame() {
         />
         {gameOver && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
-            <h2 className="text-4xl font-bold text-foreground mb-4 tracking-wide" style={{ textShadow: "0 2px 16px rgba(0,0,0,0.8)" }}>
+            {winner === "You Win!" && <Confetti />}
+            <h2 className="text-4xl font-bold text-foreground mb-4 tracking-wide animate-scale-in" style={{ textShadow: "0 2px 16px rgba(0,0,0,0.8)" }}>
               {winner}
             </h2>
             <button
               onClick={restart}
-              className="px-6 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-lg hover:bg-primary/90 active:scale-95 transition-all cursor-pointer"
+              className="px-6 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-lg hover:bg-primary/90 active:scale-95 transition-all cursor-pointer animate-fade-in"
             >
               Play Again
             </button>
