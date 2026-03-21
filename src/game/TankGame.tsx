@@ -158,17 +158,26 @@ export default function TankGame() {
   function updatePlayer(S: GameState) {
     const k = keysRef.current;
     const p = S.player;
-    let move = 0, rot = 0;
-    if (k.has("w") || k.has("arrowup")) move += 1;
-    if (k.has("s") || k.has("arrowdown")) move -= 1;
-    if (k.has("a") || k.has("arrowleft")) rot -= 1;
-    if (k.has("d") || k.has("arrowright")) rot += 1;
 
-    p.angle += rot * p.rotSpeed;
+    // direct 4-directional movement (WASD / arrows)
+    let dx = 0, dy = 0;
+    if (k.has("a") || k.has("arrowleft")) dx -= 1;
+    if (k.has("d") || k.has("arrowright")) dx += 1;
+    if (k.has("w") || k.has("arrowup")) dy -= 1;
+    if (k.has("s") || k.has("arrowdown")) dy += 1;
+
+    // normalize diagonal
+    const mag = Math.hypot(dx, dy);
+    if (mag > 0) {
+      dx /= mag;
+      dy /= mag;
+      // rotate body to face movement direction
+      p.angle = Math.atan2(dy, dx);
+    }
 
     // acceleration-based movement
-    p.vel.x += Math.cos(p.angle) * move * p.accel;
-    p.vel.y += Math.sin(p.angle) * move * p.accel;
+    p.vel.x += dx * p.accel;
+    p.vel.y += dy * p.accel;
     const spd = Math.hypot(p.vel.x, p.vel.y);
     if (spd > p.speed) {
       p.vel.x = (p.vel.x / spd) * p.speed;
