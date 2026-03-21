@@ -78,8 +78,8 @@ function initState(): GameState {
   return {
     player: makeTank(80, CANVAS_H / 2, "#3a7d44", "#2d5e33"),
     ai: makeTank(CANVAS_W - 80, CANVAS_H / 2, "#b84040", "#8c3030"),
-    bullets: [], obstacles: generateObstacles(), particles: [],
-    score: 0, gameOver: false, winner: "",
+    bullets: [], obstacles: generateObstacles(), particles: [], explosions: [],
+    score: 0, gameOver: false, winner: "", deathTimer: 0,
   };
 }
 
