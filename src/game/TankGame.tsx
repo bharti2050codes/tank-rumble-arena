@@ -385,9 +385,15 @@ export default function TankGame() {
 
   // ── Drawing ──────────────────────────────────────────────────────
   function draw(ctx: CanvasRenderingContext2D, S: GameState) {
+    ctx.save();
+    // screen shake during explosions
+    if (S.explosions.length > 0) {
+      const intensity = S.explosions.reduce((max, e) => Math.max(max, e.life / e.maxLife), 0) * 8;
+      ctx.translate(rng(-intensity, intensity), rng(-intensity, intensity));
+    }
     // ground
     ctx.fillStyle = "#1e2b1e";
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.fillRect(-10, -10, CANVAS_W + 20, CANVAS_H + 20);
 
     // ground texture (subtle grid)
     ctx.strokeStyle = "rgba(255,255,255,0.03)";
