@@ -336,7 +336,13 @@ export default function TankGame() {
           S.gameOver = true;
           S.winner = b.owner === "player" ? "You Win!" : "AI Wins!";
           if (b.owner === "player") S.score += 100;
-          spawnParticles(S.particles, target.pos, target.color, 30);
+          spawnParticles(S.particles, target.pos, target.color, 40);
+          spawnParticles(S.particles, target.pos, "#e8c44a", 25);
+          spawnParticles(S.particles, target.pos, "#fff", 15);
+          // spawn expanding explosion rings
+          S.explosions.push({ pos: { ...target.pos }, radius: 5, maxRadius: 80, life: 60, maxLife: 60 });
+          S.explosions.push({ pos: { ...target.pos }, radius: 5, maxRadius: 50, life: 45, maxLife: 45 });
+          S.deathTimer = 120; // 2 seconds at 60fps
         }
         if (b.owner === "player") S.score += 10;
       }
