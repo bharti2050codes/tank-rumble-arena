@@ -90,6 +90,7 @@ export default function TankGame() {
   const keysRef = useRef<Set<string>>(new Set());
   const mouseRef = useRef<Vec2>({ x: CANVAS_W / 2, y: CANVAS_H / 2 });
   const mouseDownRef = useRef(false);
+  const hasFiredRef = useRef(false);
   const rafRef = useRef<number>(0);
   const [score, setScore] = useState(0);
   const [playerHp, setPlayerHp] = useState(100);
