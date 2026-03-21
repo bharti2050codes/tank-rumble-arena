@@ -616,8 +616,16 @@ export default function TankGame() {
         {gameOver && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
             {winner === "You Win!" && <Confetti />}
-            <h2 className="text-4xl font-bold text-foreground mb-4 tracking-wide animate-scale-in" style={{ textShadow: "0 2px 16px rgba(0,0,0,0.8)" }}>
-              {winner}
+            <h2
+              className="text-5xl font-black text-foreground mb-4 tracking-wider"
+              style={{
+                textShadow: "0 0 20px rgba(255,200,60,0.6), 0 2px 16px rgba(0,0,0,0.8)",
+                animation: winner === "You Win!"
+                  ? "winner-pop 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards, winner-pulse 1.5s 0.6s ease-in-out infinite"
+                  : "scale-in 0.3s ease-out forwards",
+              }}
+            >
+              {winner === "You Win!" ? "🏆 YOU WIN! 🏆" : winner}
             </h2>
             <button
               onClick={restart}
@@ -625,6 +633,18 @@ export default function TankGame() {
             >
               Play Again
             </button>
+            <style>{`
+              @keyframes winner-pop {
+                0% { transform: scale(0) rotate(-8deg); opacity: 0; }
+                60% { transform: scale(1.15) rotate(3deg); opacity: 1; }
+                80% { transform: scale(0.95) rotate(-1deg); }
+                100% { transform: scale(1) rotate(0deg); opacity: 1; }
+              }
+              @keyframes winner-pulse {
+                0%, 100% { transform: scale(1); filter: brightness(1); }
+                50% { transform: scale(1.05); filter: brightness(1.2); }
+              }
+            `}</style>
           </div>
         )}
       </div>
