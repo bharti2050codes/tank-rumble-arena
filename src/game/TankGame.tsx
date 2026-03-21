@@ -543,17 +543,13 @@ export default function TankGame() {
           style={{ maxWidth: "100%", height: "auto" }}
         />
         {gameOver && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70">
-            <h2 className="text-4xl font-bold text-foreground mb-2 tracking-wide" style={{ textShadow: "0 2px 12px rgba(0,0,0,0.6)" }}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <h2 className="text-4xl font-bold text-foreground mb-2 tracking-wide animate-fade-in" style={{ textShadow: "0 2px 16px rgba(0,0,0,0.8)" }}>
               {winner}
             </h2>
-            <p className="text-muted-foreground mb-6 font-mono">Final Score: {score}</p>
-            <button
-              onClick={restart}
-              className="px-6 py-2 bg-primary text-primary-foreground font-bold rounded hover:opacity-90 active:scale-95 transition-all"
-            >
-              Play Again
-            </button>
+            <p className="text-muted-foreground font-mono animate-fade-in" style={{ animationDelay: "0.3s" }}>
+              Restarting...
+            </p>
           </div>
         )}
       </div>
