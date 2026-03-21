@@ -412,6 +412,29 @@ export default function TankGame() {
     }
     ctx.globalAlpha = 1;
 
+    // explosions
+    for (const e of S.explosions) {
+      const a = e.life / e.maxLife;
+      ctx.globalAlpha = a * 0.7;
+      // outer glow
+      const grad = ctx.createRadialGradient(e.pos.x, e.pos.y, 0, e.pos.x, e.pos.y, e.radius);
+      grad.addColorStop(0, "rgba(255, 200, 60, 0.9)");
+      grad.addColorStop(0.4, "rgba(255, 100, 30, 0.6)");
+      grad.addColorStop(0.7, "rgba(200, 50, 20, 0.3)");
+      grad.addColorStop(1, "rgba(100, 20, 10, 0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(e.pos.x, e.pos.y, e.radius, 0, Math.PI * 2);
+      ctx.fill();
+      // bright core
+      ctx.globalAlpha = a;
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.arc(e.pos.x, e.pos.y, e.radius * 0.15 * a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
     // bullets
     for (const b of S.bullets) {
       ctx.fillStyle = "#e8c44a";
