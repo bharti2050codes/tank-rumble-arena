@@ -12,9 +12,12 @@ interface Tank {
 interface Bullet { pos: Vec2; vel: Vec2; owner: "player" | "ai"; life: number }
 interface Obstacle { pos: Vec2; w: number; h: number }
 interface Particle { pos: Vec2; vel: Vec2; life: number; maxLife: number; color: string; size: number }
+interface Explosion { pos: Vec2; radius: number; maxRadius: number; life: number; maxLife: number }
 interface GameState {
   player: Tank; ai: Tank; bullets: Bullet[]; obstacles: Obstacle[];
-  particles: Particle[]; score: number; gameOver: boolean; winner: string;
+  particles: Particle[]; explosions: Explosion[];
+  score: number; gameOver: boolean; winner: string;
+  deathTimer: number;
 }
 
 const CANVAS_W = 960;
@@ -75,8 +78,8 @@ function initState(): GameState {
   return {
     player: makeTank(80, CANVAS_H / 2, "#3a7d44", "#2d5e33"),
     ai: makeTank(CANVAS_W - 80, CANVAS_H / 2, "#b84040", "#8c3030"),
-    bullets: [], obstacles: generateObstacles(), particles: [],
-    score: 0, gameOver: false, winner: "",
+    bullets: [], obstacles: generateObstacles(), particles: [], explosions: [],
+    score: 0, gameOver: false, winner: "", deathTimer: 0,
   };
 }
 
@@ -135,11 +138,18 @@ export default function TankGame() {
         updateAI(S);
         updateBullets(S);
         updateParticles(S);
-        // sync react state
         setScore(S.score);
         setPlayerHp(S.player.hp);
         setAiHp(S.ai.hp);
         if (S.gameOver) { setGameOver(true); setWinner(S.winner); }
+      } else {
+        // death animation phase
+        updateParticles(S);
+        updateExplosions(S);
+        S.deathTimer--;
+        if (S.deathTimer <= 0) {
+          restart();
+        }
       }
       draw(ctx, S);
       rafRef.current = requestAnimationFrame(loop);
@@ -333,7 +343,13 @@ export default function TankGame() {
           S.gameOver = true;
           S.winner = b.owner === "player" ? "You Win!" : "AI Wins!";
           if (b.owner === "player") S.score += 100;
-          spawnParticles(S.particles, target.pos, target.color, 30);
+          spawnParticles(S.particles, target.pos, target.color, 40);
+          spawnParticles(S.particles, target.pos, "#e8c44a", 25);
+          spawnParticles(S.particles, target.pos, "#fff", 15);
+          // spawn expanding explosion rings
+          S.explosions.push({ pos: { ...target.pos }, radius: 5, maxRadius: 80, life: 60, maxLife: 60 });
+          S.explosions.push({ pos: { ...target.pos }, radius: 5, maxRadius: 50, life: 45, maxLife: 45 });
+          S.deathTimer = 120; // 2 seconds at 60fps
         }
         if (b.owner === "player") S.score += 10;
       }
@@ -352,11 +368,32 @@ export default function TankGame() {
     }
   }
 
+  function updateExplosions(S: GameState) {
+    for (let i = S.explosions.length - 1; i >= 0; i--) {
+      const e = S.explosions[i];
+      e.radius = lerp(e.radius, e.maxRadius, 0.08);
+      e.life--;
+      if (e.life % 3 === 0) {
+        spawnParticles(S.particles, {
+          x: e.pos.x + rng(-e.radius * 0.5, e.radius * 0.5),
+          y: e.pos.y + rng(-e.radius * 0.5, e.radius * 0.5),
+        }, Math.random() > 0.5 ? "#e8c44a" : "#ff6633", 2);
+      }
+      if (e.life <= 0) S.explosions.splice(i, 1);
+    }
+  }
+
   // ── Drawing ──────────────────────────────────────────────────────
   function draw(ctx: CanvasRenderingContext2D, S: GameState) {
+    ctx.save();
+    // screen shake during explosions
+    if (S.explosions.length > 0) {
+      const intensity = S.explosions.reduce((max, e) => Math.max(max, e.life / e.maxLife), 0) * 8;
+      ctx.translate(rng(-intensity, intensity), rng(-intensity, intensity));
+    }
     // ground
     ctx.fillStyle = "#1e2b1e";
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.fillRect(-10, -10, CANVAS_W + 20, CANVAS_H + 20);
 
     // ground texture (subtle grid)
     ctx.strokeStyle = "rgba(255,255,255,0.03)";
@@ -396,6 +433,29 @@ export default function TankGame() {
     }
     ctx.globalAlpha = 1;
 
+    // explosions
+    for (const e of S.explosions) {
+      const a = e.life / e.maxLife;
+      ctx.globalAlpha = a * 0.7;
+      // outer glow
+      const grad = ctx.createRadialGradient(e.pos.x, e.pos.y, 0, e.pos.x, e.pos.y, e.radius);
+      grad.addColorStop(0, "rgba(255, 200, 60, 0.9)");
+      grad.addColorStop(0.4, "rgba(255, 100, 30, 0.6)");
+      grad.addColorStop(0.7, "rgba(200, 50, 20, 0.3)");
+      grad.addColorStop(1, "rgba(100, 20, 10, 0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(e.pos.x, e.pos.y, e.radius, 0, Math.PI * 2);
+      ctx.fill();
+      // bright core
+      ctx.globalAlpha = a;
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.arc(e.pos.x, e.pos.y, e.radius * 0.15 * a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
     // bullets
     for (const b of S.bullets) {
       ctx.fillStyle = "#e8c44a";
@@ -410,6 +470,7 @@ export default function TankGame() {
     // tanks
     drawTank(ctx, S.player);
     drawTank(ctx, S.ai);
+    ctx.restore();
   }
 
   function drawTank(ctx: CanvasRenderingContext2D, t: Tank) {
@@ -489,17 +550,13 @@ export default function TankGame() {
           style={{ maxWidth: "100%", height: "auto" }}
         />
         {gameOver && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70">
-            <h2 className="text-4xl font-bold text-foreground mb-2 tracking-wide" style={{ textShadow: "0 2px 12px rgba(0,0,0,0.6)" }}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <h2 className="text-4xl font-bold text-foreground mb-2 tracking-wide animate-fade-in" style={{ textShadow: "0 2px 16px rgba(0,0,0,0.8)" }}>
               {winner}
             </h2>
-            <p className="text-muted-foreground mb-6 font-mono">Final Score: {score}</p>
-            <button
-              onClick={restart}
-              className="px-6 py-2 bg-primary text-primary-foreground font-bold rounded hover:opacity-90 active:scale-95 transition-all"
-            >
-              Play Again
-            </button>
+            <p className="text-muted-foreground font-mono animate-fade-in" style={{ animationDelay: "0.3s" }}>
+              Restarting...
+            </p>
           </div>
         )}
       </div>
