@@ -206,6 +206,7 @@ export default function TankGame() {
     p.cooldown = Math.max(0, p.cooldown - 1);
 
     if ((mouseDownRef.current || k.has(" ")) && p.cooldown === 0) {
+      hasFiredRef.current = true;
       fireBullet(S, p, "player");
       p.cooldown = p.maxCooldown;
     }
