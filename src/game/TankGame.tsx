@@ -3,8 +3,9 @@ import { useEffect, useRef, useCallback, useState } from "react";
 // ── Types ──────────────────────────────────────────────────────────────
 interface Vec2 { x: number; y: number }
 interface Tank {
-  pos: Vec2; angle: number; turretAngle: number;
+  pos: Vec2; vel: Vec2; angle: number; turretAngle: number;
   hp: number; maxHp: number; speed: number; rotSpeed: number;
+  accel: number; friction: number;
   cooldown: number; maxCooldown: number; color: string; trackColor: string;
   width: number; height: number;
 }
