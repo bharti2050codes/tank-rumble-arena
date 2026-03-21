@@ -260,7 +260,7 @@ export default function TankGame() {
     }
 
     ai.cooldown = Math.max(0, ai.cooldown - 1);
-    if (ai.cooldown === 0 && d < 500) {
+    if (ai.cooldown === 0 && d < 500 && hasFiredRef.current) {
       // check line of sight
       if (hasLineOfSight(ai.pos, p.pos, S.obstacles)) {
         fireBullet(S, ai, "ai");
