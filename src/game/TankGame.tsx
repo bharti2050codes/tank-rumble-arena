@@ -165,11 +165,26 @@ export default function TankGame() {
     if (k.has("d") || k.has("arrowright")) rot += 1;
 
     p.angle += rot * p.rotSpeed;
-    const nx = p.pos.x + Math.cos(p.angle) * move * p.speed;
-    const ny = p.pos.y + Math.sin(p.angle) * move * p.speed;
+
+    // acceleration-based movement
+    p.vel.x += Math.cos(p.angle) * move * p.accel;
+    p.vel.y += Math.sin(p.angle) * move * p.accel;
+    const spd = Math.hypot(p.vel.x, p.vel.y);
+    if (spd > p.speed) {
+      p.vel.x = (p.vel.x / spd) * p.speed;
+      p.vel.y = (p.vel.y / spd) * p.speed;
+    }
+    p.vel.x *= p.friction;
+    p.vel.y *= p.friction;
+
+    const nx = p.pos.x + p.vel.x;
+    const ny = p.pos.y + p.vel.y;
     if (!collidesObstacles(nx, ny, p.width, p.height, S.obstacles)) {
       p.pos.x = clamp(nx, p.width / 2, CANVAS_W - p.width / 2);
       p.pos.y = clamp(ny, p.height / 2, CANVAS_H - p.height / 2);
+    } else {
+      p.vel.x *= -0.3;
+      p.vel.y *= -0.3;
     }
     p.turretAngle = angleTo(p.pos, mouseRef.current);
     p.cooldown = Math.max(0, p.cooldown - 1);
