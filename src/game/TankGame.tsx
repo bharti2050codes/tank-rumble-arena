@@ -157,6 +157,7 @@ export default function TankGame() {
   const mouseRef = useRef<Vec2>({ x: CANVAS_W / 2, y: CANVAS_H / 2 });
   const mouseDownRef = useRef(false);
   const hasFiredRef = useRef(false);
+  const playerInteractedRef = useRef(false);
   const rafRef = useRef<number>(0);
   const [score, setScore] = useState(0);
   const [playerHp, setPlayerHp] = useState(100);
@@ -167,6 +168,8 @@ export default function TankGame() {
   const restart = useCallback(() => {
     stateRef.current = initState();
     hasFiredRef.current = false;
+    playerInteractedRef.current = false;
+    mouseDownRef.current = false;
     setScore(0); setPlayerHp(100); setAiHp(100);
     setGameOver(false); setWinner("");
   }, []);
@@ -189,7 +192,7 @@ export default function TankGame() {
         y: (e.clientY - r.top) * (CANVAS_H / r.height),
       };
     };
-    const onMouseDown = () => { mouseDownRef.current = true; };
+    const onMouseDown = () => { playerInteractedRef.current = true; mouseDownRef.current = true; };
     const onMouseUp = () => { mouseDownRef.current = false; };
 
     window.addEventListener("keydown", e => onKey(e, true));
@@ -271,7 +274,8 @@ export default function TankGame() {
     p.turretAngle = angleTo(p.pos, mouseRef.current);
     p.cooldown = Math.max(0, p.cooldown - 1);
 
-    if ((mouseDownRef.current || k.has(" ")) && p.cooldown === 0) {
+    const wantsFire = (mouseDownRef.current || k.has(" ")) && playerInteractedRef.current;
+    if (wantsFire && p.cooldown === 0) {
       hasFiredRef.current = true;
       fireBullet(S, p, "player");
       p.cooldown = p.maxCooldown;
