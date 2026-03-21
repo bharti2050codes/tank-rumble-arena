@@ -143,13 +143,8 @@ export default function TankGame() {
         setAiHp(S.ai.hp);
         if (S.gameOver) { setGameOver(true); setWinner(S.winner); }
       } else {
-        // death animation phase
         updateParticles(S);
         updateExplosions(S);
-        S.deathTimer--;
-        if (S.deathTimer <= 0) {
-          restart();
-        }
       }
       draw(ctx, S);
       rafRef.current = requestAnimationFrame(loop);
