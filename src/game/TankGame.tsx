@@ -368,6 +368,21 @@ export default function TankGame() {
     }
   }
 
+  function updateExplosions(S: GameState) {
+    for (let i = S.explosions.length - 1; i >= 0; i--) {
+      const e = S.explosions[i];
+      e.radius = lerp(e.radius, e.maxRadius, 0.08);
+      e.life--;
+      if (e.life % 3 === 0) {
+        spawnParticles(S.particles, {
+          x: e.pos.x + rng(-e.radius * 0.5, e.radius * 0.5),
+          y: e.pos.y + rng(-e.radius * 0.5, e.radius * 0.5),
+        }, Math.random() > 0.5 ? "#e8c44a" : "#ff6633", 2);
+      }
+      if (e.life <= 0) S.explosions.splice(i, 1);
+    }
+  }
+
   // ── Drawing ──────────────────────────────────────────────────────
   function draw(ctx: CanvasRenderingContext2D, S: GameState) {
     // ground
