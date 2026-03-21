@@ -12,9 +12,12 @@ interface Tank {
 interface Bullet { pos: Vec2; vel: Vec2; owner: "player" | "ai"; life: number }
 interface Obstacle { pos: Vec2; w: number; h: number }
 interface Particle { pos: Vec2; vel: Vec2; life: number; maxLife: number; color: string; size: number }
+interface Explosion { pos: Vec2; radius: number; maxRadius: number; life: number; maxLife: number }
 interface GameState {
   player: Tank; ai: Tank; bullets: Bullet[]; obstacles: Obstacle[];
-  particles: Particle[]; score: number; gameOver: boolean; winner: string;
+  particles: Particle[]; explosions: Explosion[];
+  score: number; gameOver: boolean; winner: string;
+  deathTimer: number;
 }
 
 const CANVAS_W = 960;
