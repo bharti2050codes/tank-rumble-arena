@@ -87,13 +87,15 @@ function initState(): GameState {
 // ── Confetti ───────────────────────────────────────────────────────────
 function Confetti() {
   const pieces = useRef(
-    Array.from({ length: 60 }, () => ({
+    Array.from({ length: 100 }, (_, i) => ({
       x: Math.random() * 100,
-      delay: Math.random() * 2,
-      duration: 1.5 + Math.random() * 2,
-      color: ["#e8c44a", "#4a8", "#c44", "#48f", "#f4a", "#fa4"][Math.floor(Math.random() * 6)],
-      size: 4 + Math.random() * 6,
-      drift: (Math.random() - 0.5) * 40,
+      delay: Math.random() * 1.5,
+      duration: 1.2 + Math.random() * 1.8,
+      color: ["#ffe14d", "#ff4d6a", "#4dafff", "#4dff91", "#ff8a4d", "#d94dff", "#fff"][Math.floor(Math.random() * 7)],
+      size: 5 + Math.random() * 8,
+      drift: (Math.random() - 0.5) * 120,
+      spin: 360 + Math.random() * 720,
+      type: i % 3, // 0=rect, 1=circle, 2=strip
     }))
   ).current;
 
@@ -102,21 +104,45 @@ function Confetti() {
       {pieces.map((p, i) => (
         <div
           key={i}
-          className="absolute rounded-sm"
+          className="absolute"
           style={{
             left: `${p.x}%`,
-            top: "-10px",
-            width: p.size,
-            height: p.size * 1.4,
+            top: "-14px",
+            width: p.type === 2 ? p.size * 0.4 : p.size,
+            height: p.type === 2 ? p.size * 2.2 : p.size * (p.type === 0 ? 1.4 : 1),
             background: p.color,
-            animation: `confetti-fall ${p.duration}s ${p.delay}s ease-in forwards`,
+            borderRadius: p.type === 1 ? "50%" : "2px",
+            animation: `confetti-fall-${i % 4} ${p.duration}s ${p.delay}s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards`,
+            ["--drift" as string]: `${p.drift}px`,
+            ["--spin" as string]: `${p.spin}deg`,
           }}
         />
       ))}
       <style>{`
-        @keyframes confetti-fall {
-          0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-          100% { transform: translateY(700px) rotate(720deg); opacity: 0; }
+        @keyframes confetti-fall-0 {
+          0% { transform: translateY(0) translateX(0) rotate(0deg) scale(1); opacity: 1; }
+          25% { transform: translateY(150px) translateX(var(--drift)) rotate(calc(var(--spin) * 0.4)) scale(1.1); opacity: 1; }
+          50% { transform: translateY(350px) translateX(calc(var(--drift) * -0.6)) rotate(calc(var(--spin) * 0.7)) scale(0.9); opacity: 0.9; }
+          100% { transform: translateY(700px) translateX(var(--drift)) rotate(var(--spin)) scale(0.5); opacity: 0; }
+        }
+        @keyframes confetti-fall-1 {
+          0% { transform: translateY(0) translateX(0) rotateX(0deg) rotateZ(0deg) scale(0.8); opacity: 1; }
+          30% { transform: translateY(180px) translateX(calc(var(--drift) * 0.8)) rotateX(180deg) rotateZ(90deg) scale(1.2); opacity: 1; }
+          60% { transform: translateY(400px) translateX(calc(var(--drift) * -0.4)) rotateX(360deg) rotateZ(200deg) scale(1); opacity: 0.8; }
+          100% { transform: translateY(700px) translateX(var(--drift)) rotateX(540deg) rotateZ(var(--spin)) scale(0.4); opacity: 0; }
+        }
+        @keyframes confetti-fall-2 {
+          0% { transform: translateY(0) translateX(0) rotate(0deg) scaleY(1); opacity: 1; }
+          20% { transform: translateY(100px) translateX(calc(var(--drift) * 1.2)) rotate(calc(var(--spin) * 0.3)) scaleY(0.5); opacity: 1; }
+          50% { transform: translateY(300px) translateX(calc(var(--drift) * -0.8)) rotate(calc(var(--spin) * 0.6)) scaleY(1.3); opacity: 0.9; }
+          100% { transform: translateY(700px) translateX(calc(var(--drift) * 0.5)) rotate(var(--spin)) scaleY(0.6); opacity: 0; }
+        }
+        @keyframes confetti-fall-3 {
+          0% { transform: translateY(0) translateX(0) rotate(0deg); opacity: 1; }
+          15% { transform: translateY(80px) translateX(calc(var(--drift) * -1)) rotate(calc(var(--spin) * 0.2)); opacity: 1; }
+          45% { transform: translateY(280px) translateX(calc(var(--drift) * 0.7)) rotate(calc(var(--spin) * 0.5)); opacity: 1; }
+          75% { transform: translateY(500px) translateX(calc(var(--drift) * -0.3)) rotate(calc(var(--spin) * 0.8)); opacity: 0.7; }
+          100% { transform: translateY(700px) translateX(var(--drift)) rotate(var(--spin)); opacity: 0; }
         }
       `}</style>
     </div>
@@ -590,8 +616,16 @@ export default function TankGame() {
         {gameOver && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
             {winner === "You Win!" && <Confetti />}
-            <h2 className="text-4xl font-bold text-foreground mb-4 tracking-wide animate-scale-in" style={{ textShadow: "0 2px 16px rgba(0,0,0,0.8)" }}>
-              {winner}
+            <h2
+              className="text-5xl font-black text-foreground mb-4 tracking-wider"
+              style={{
+                textShadow: "0 0 20px rgba(255,200,60,0.6), 0 2px 16px rgba(0,0,0,0.8)",
+                animation: winner === "You Win!"
+                  ? "winner-pop 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards, winner-pulse 1.5s 0.6s ease-in-out infinite"
+                  : "scale-in 0.3s ease-out forwards",
+              }}
+            >
+              {winner === "You Win!" ? "🏆 YOU WIN! 🏆" : winner}
             </h2>
             <button
               onClick={restart}
@@ -599,6 +633,18 @@ export default function TankGame() {
             >
               Play Again
             </button>
+            <style>{`
+              @keyframes winner-pop {
+                0% { transform: scale(0) rotate(-8deg); opacity: 0; }
+                60% { transform: scale(1.15) rotate(3deg); opacity: 1; }
+                80% { transform: scale(0.95) rotate(-1deg); }
+                100% { transform: scale(1) rotate(0deg); opacity: 1; }
+              }
+              @keyframes winner-pulse {
+                0%, 100% { transform: scale(1); filter: brightness(1); }
+                50% { transform: scale(1.05); filter: brightness(1.2); }
+              }
+            `}</style>
           </div>
         )}
       </div>
