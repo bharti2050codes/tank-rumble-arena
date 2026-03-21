@@ -138,11 +138,18 @@ export default function TankGame() {
         updateAI(S);
         updateBullets(S);
         updateParticles(S);
-        // sync react state
         setScore(S.score);
         setPlayerHp(S.player.hp);
         setAiHp(S.ai.hp);
         if (S.gameOver) { setGameOver(true); setWinner(S.winner); }
+      } else {
+        // death animation phase
+        updateParticles(S);
+        updateExplosions(S);
+        S.deathTimer--;
+        if (S.deathTimer <= 0) {
+          restart();
+        }
       }
       draw(ctx, S);
       rafRef.current = requestAnimationFrame(loop);
