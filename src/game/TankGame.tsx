@@ -549,12 +549,13 @@ export default function TankGame() {
         />
         {gameOver && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
-            <h2 className="text-4xl font-bold text-foreground mb-4 tracking-wide" style={{ textShadow: "0 2px 16px rgba(0,0,0,0.8)" }}>
+            {winner === "You Win!" && <Confetti />}
+            <h2 className="text-4xl font-bold text-foreground mb-4 tracking-wide animate-scale-in" style={{ textShadow: "0 2px 16px rgba(0,0,0,0.8)" }}>
               {winner}
             </h2>
             <button
               onClick={restart}
-              className="px-6 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-lg hover:bg-primary/90 active:scale-95 transition-all cursor-pointer"
+              className="px-6 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-lg hover:bg-primary/90 active:scale-95 transition-all cursor-pointer animate-fade-in"
             >
               Play Again
             </button>
