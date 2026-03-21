@@ -192,7 +192,7 @@ export default function TankGame() {
         y: (e.clientY - r.top) * (CANVAS_H / r.height),
       };
     };
-    const onMouseDown = () => { mouseDownRef.current = true; };
+    const onMouseDown = () => { playerInteractedRef.current = true; mouseDownRef.current = true; };
     const onMouseUp = () => { mouseDownRef.current = false; };
 
     window.addEventListener("keydown", e => onKey(e, true));
