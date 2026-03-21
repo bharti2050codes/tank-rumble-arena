@@ -100,6 +100,7 @@ export default function TankGame() {
 
   const restart = useCallback(() => {
     stateRef.current = initState();
+    hasFiredRef.current = false;
     setScore(0); setPlayerHp(100); setAiHp(100);
     setGameOver(false); setWinner("");
   }, []);
