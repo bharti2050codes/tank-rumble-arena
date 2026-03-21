@@ -143,13 +143,8 @@ export default function TankGame() {
         setAiHp(S.ai.hp);
         if (S.gameOver) { setGameOver(true); setWinner(S.winner); }
       } else {
-        // death animation phase
         updateParticles(S);
         updateExplosions(S);
-        S.deathTimer--;
-        if (S.deathTimer <= 0) {
-          restart();
-        }
       }
       draw(ctx, S);
       rafRef.current = requestAnimationFrame(loop);
@@ -550,13 +545,16 @@ export default function TankGame() {
           style={{ maxWidth: "100%", height: "auto" }}
         />
         {gameOver && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <h2 className="text-4xl font-bold text-foreground mb-2 tracking-wide animate-fade-in" style={{ textShadow: "0 2px 16px rgba(0,0,0,0.8)" }}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
+            <h2 className="text-4xl font-bold text-foreground mb-4 tracking-wide" style={{ textShadow: "0 2px 16px rgba(0,0,0,0.8)" }}>
               {winner}
             </h2>
-            <p className="text-muted-foreground font-mono animate-fade-in" style={{ animationDelay: "0.3s" }}>
-              Restarting...
-            </p>
+            <button
+              onClick={restart}
+              className="px-6 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-lg hover:bg-primary/90 active:scale-95 transition-all cursor-pointer"
+            >
+              Play Again
+            </button>
           </div>
         )}
       </div>
