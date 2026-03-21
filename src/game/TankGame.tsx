@@ -84,6 +84,46 @@ function initState(): GameState {
 }
 
 // ── Component ──────────────────────────────────────────────────────────
+// ── Confetti ───────────────────────────────────────────────────────────
+function Confetti() {
+  const pieces = useRef(
+    Array.from({ length: 60 }, () => ({
+      x: Math.random() * 100,
+      delay: Math.random() * 2,
+      duration: 1.5 + Math.random() * 2,
+      color: ["#e8c44a", "#4a8", "#c44", "#48f", "#f4a", "#fa4"][Math.floor(Math.random() * 6)],
+      size: 4 + Math.random() * 6,
+      drift: (Math.random() - 0.5) * 40,
+    }))
+  ).current;
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {pieces.map((p, i) => (
+        <div
+          key={i}
+          className="absolute rounded-sm"
+          style={{
+            left: `${p.x}%`,
+            top: "-10px",
+            width: p.size,
+            height: p.size * 1.4,
+            background: p.color,
+            animation: `confetti-fall ${p.duration}s ${p.delay}s ease-in forwards`,
+          }}
+        />
+      ))}
+      <style>{`
+        @keyframes confetti-fall {
+          0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(700px) rotate(720deg); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ── Component ──────────────────────────────────────────────────────────
 export default function TankGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<GameState>(initState());
