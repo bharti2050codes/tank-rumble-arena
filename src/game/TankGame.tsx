@@ -63,8 +63,9 @@ function generateObstacles(): Obstacle[] {
 
 function makeTank(x: number, y: number, color: string, trackColor: string): Tank {
   return {
-    pos: { x, y }, angle: 0, turretAngle: 0,
-    hp: 100, maxHp: 100, speed: 2.2, rotSpeed: 0.04,
+    pos: { x, y }, vel: { x: 0, y: 0 }, angle: 0, turretAngle: 0,
+    hp: 100, maxHp: 100, speed: 3, rotSpeed: 0.045,
+    accel: 0.15, friction: 0.92,
     cooldown: 0, maxCooldown: 25, color, trackColor,
     width: 36, height: 28,
   };
