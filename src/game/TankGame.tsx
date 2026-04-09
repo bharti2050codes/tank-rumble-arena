@@ -173,6 +173,10 @@ export default function TankGame() {
     radius: 50,
   });
   const [aimState, setAimState] = useState({ isActive: false, x: 0, y: 0 });
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  });
 
   const restart = useCallback(() => {
     stateRef.current = initState();
@@ -662,7 +666,9 @@ export default function TankGame() {
 
       {/* Controls */}
       <p className="text-muted-foreground text-xs font-mono tracking-wide">
-        Desktop: WASD / Arrows to move · Mouse to aim · Click / Space to fire · Mobile: Left side to move · Right side to aim & fire
+        {isMobile 
+          ? "Left side: Drag joystick to move · Right side: Tap to shoot"
+          : "WASD / Arrows to move · Mouse to aim · Click / Space to fire"}
       </p>
     </div>
   );
