@@ -1,4 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
+import { InputManager } from "./controls/InputManager";
+import { VirtualJoystick } from "./controls/VirtualJoystick";
+import { GameInput } from "./controls/types";
 
 // ── Types ──────────────────────────────────────────────────────────────
 interface Vec2 { x: number; y: number }
@@ -153,66 +156,74 @@ function Confetti() {
 export default function TankGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<GameState>(initState());
-  const keysRef = useRef<Set<string>>(new Set());
-  const mouseRef = useRef<Vec2>({ x: CANVAS_W / 2, y: CANVAS_H / 2 });
-  const mouseDownRef = useRef(false);
+  const inputManagerRef = useRef<InputManager | null>(null);
   const hasFiredRef = useRef(false);
-  const playerInteractedRef = useRef(false);
   const rafRef = useRef<number>(0);
   const [score, setScore] = useState(0);
   const [playerHp, setPlayerHp] = useState(100);
   const [aiHp, setAiHp] = useState(100);
   const [gameOver, setGameOver] = useState(false);
   const [winner, setWinner] = useState("");
+  const [joystickState, setJoystickState] = useState({
+    isActive: false,
+    centerX: 0,
+    centerY: 0,
+    currentX: 0,
+    currentY: 0,
+    radius: 50,
+  });
+  const [aimState, setAimState] = useState({ isActive: false, x: 0, y: 0 });
 
   const restart = useCallback(() => {
     stateRef.current = initState();
     hasFiredRef.current = false;
-    playerInteractedRef.current = false;
-    mouseDownRef.current = false;
-    setScore(0); setPlayerHp(100); setAiHp(100);
-    setGameOver(false); setWinner("");
+    if (inputManagerRef.current) {
+      inputManagerRef.current.setPlayerInteracted(false);
+    }
+    setScore(0);
+    setPlayerHp(100);
+    setAiHp(100);
+    setGameOver(false);
+    setWinner("");
   }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
 
-    const onKey = (e: KeyboardEvent, down: boolean) => {
-      const k = e.key.toLowerCase();
-      if (["w","a","s","d","arrowup","arrowdown","arrowleft","arrowright"," "].includes(k)) {
-        e.preventDefault();
-        down ? keysRef.current.add(k) : keysRef.current.delete(k);
-      }
-    };
-    const onMouse = (e: MouseEvent) => {
-      const r = canvas.getBoundingClientRect();
-      mouseRef.current = {
-        x: (e.clientX - r.left) * (CANVAS_W / r.width),
-        y: (e.clientY - r.top) * (CANVAS_H / r.height),
-      };
-    };
-    const onMouseDown = () => { playerInteractedRef.current = true; mouseDownRef.current = true; };
-    const onMouseUp = () => { mouseDownRef.current = false; };
-
-    window.addEventListener("keydown", e => onKey(e, true));
-    window.addEventListener("keyup", e => onKey(e, false));
-    canvas.addEventListener("mousemove", onMouse);
-    canvas.addEventListener("mousedown", onMouseDown);
-    canvas.addEventListener("mouseup", onMouseUp);
+    // Initialize InputManager
+    const inputManager = new InputManager(canvas);
+    inputManagerRef.current = inputManager;
+    inputManager.attachListeners();
 
     // ── Game loop ──────────────────────────────────────────────────
     const loop = () => {
       const S = stateRef.current;
+
+      // Update input manager with player position for aiming
+      inputManager.setPlayerPos(S.player.pos);
+
+      // Get unified input
+      const input = inputManager.getInput();
+
       if (!S.gameOver) {
-        updatePlayer(S);
+        updatePlayer(S, input);
         updateAI(S);
         updateBullets(S);
         updateParticles(S);
         setScore(S.score);
         setPlayerHp(S.player.hp);
         setAiHp(S.ai.hp);
-        if (S.gameOver) { setGameOver(true); setWinner(S.winner); }
+
+        // Update joystick and aim state for rendering
+        const touchInput = inputManager.getTouch();
+        setJoystickState({ ...touchInput.getJoystickState() });
+        setAimState({ ...touchInput.getAimState() });
+
+        if (S.gameOver) {
+          setGameOver(true);
+          setWinner(S.winner);
+        }
       } else {
         updateParticles(S);
         updateExplosions(S);
@@ -224,23 +235,18 @@ export default function TankGame() {
 
     return () => {
       cancelAnimationFrame(rafRef.current);
-      window.removeEventListener("keydown", e => onKey(e, true));
-      window.removeEventListener("keyup", e => onKey(e, false));
+      inputManager.detachListeners();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Player update ────────────────────────────────────────────────
-  function updatePlayer(S: GameState) {
-    const k = keysRef.current;
+  function updatePlayer(S: GameState, input: GameInput) {
     const p = S.player;
 
-    // direct 4-directional movement (WASD / arrows)
-    let dx = 0, dy = 0;
-    if (k.has("a") || k.has("arrowleft")) dx -= 1;
-    if (k.has("d") || k.has("arrowright")) dx += 1;
-    if (k.has("w") || k.has("arrowup")) dy -= 1;
-    if (k.has("s") || k.has("arrowdown")) dy += 1;
+    // Get movement from input
+    let dx = input.movement.x;
+    let dy = input.movement.y;
 
     // normalize diagonal
     const mag = Math.hypot(dx, dy);
@@ -271,10 +277,10 @@ export default function TankGame() {
       p.vel.x *= -0.3;
       p.vel.y *= -0.3;
     }
-    p.turretAngle = angleTo(p.pos, mouseRef.current);
+    p.turretAngle = input.aimAngle;
     p.cooldown = Math.max(0, p.cooldown - 1);
 
-    const wantsFire = (mouseDownRef.current || k.has(" ")) && playerInteractedRef.current;
+    const wantsFire = input.wantsFire;
     if (wantsFire && p.cooldown === 0) {
       hasFiredRef.current = true;
       fireBullet(S, p, "player");
@@ -617,6 +623,7 @@ export default function TankGame() {
           className="block cursor-crosshair"
           style={{ maxWidth: "100%", height: "auto" }}
         />
+        <VirtualJoystick canvasRef={canvasRef} joystickState={joystickState} aimState={aimState} />
         {gameOver && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
             {winner === "You Win!" && <Confetti />}
@@ -655,7 +662,7 @@ export default function TankGame() {
 
       {/* Controls */}
       <p className="text-muted-foreground text-xs font-mono tracking-wide">
-        WASD / Arrows to move · Mouse to aim · Click / Space to fire
+        Desktop: WASD / Arrows to move · Mouse to aim · Click / Space to fire · Mobile: Left side to move · Right side to aim & fire
       </p>
     </div>
   );
