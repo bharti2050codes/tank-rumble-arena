@@ -82,7 +82,15 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    overflow: hidden;
+  }
+
   body {
     @apply bg-background text-foreground;
+    overflow: hidden;
+    width: 100%;
+    height: 100vh;
+    touch-action: none; /* Prevent default touch actions */
   }
 }

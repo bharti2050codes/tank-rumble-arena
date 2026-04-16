@@ -24,10 +24,10 @@ export class InputManager {
     this.canvas.addEventListener("mousedown", (e) => this.onMouseDown(e));
     this.canvas.addEventListener("mouseup", (e) => this.onMouseUp(e));
 
-    // Touch
-    this.canvas.addEventListener("touchstart", (e) => this.onTouchStart(e));
-    this.canvas.addEventListener("touchmove", (e) => this.onTouchMove(e));
-    this.canvas.addEventListener("touchend", (e) => this.onTouchEnd(e));
+    // Touch - listen on window for joystick outside canvas
+    window.addEventListener("touchstart", (e) => this.onTouchStart(e));
+    window.addEventListener("touchmove", (e) => this.onTouchMove(e));
+    window.addEventListener("touchend", (e) => this.onTouchEnd(e));
   }
 
   detachListeners() {
@@ -36,9 +36,9 @@ export class InputManager {
     this.canvas.removeEventListener("mousemove", (e) => this.onMouseMove(e));
     this.canvas.removeEventListener("mousedown", (e) => this.onMouseDown(e));
     this.canvas.removeEventListener("mouseup", (e) => this.onMouseUp(e));
-    this.canvas.removeEventListener("touchstart", (e) => this.onTouchStart(e));
-    this.canvas.removeEventListener("touchmove", (e) => this.onTouchMove(e));
-    this.canvas.removeEventListener("touchend", (e) => this.onTouchEnd(e));
+    window.removeEventListener("touchstart", (e) => this.onTouchStart(e));
+    window.removeEventListener("touchmove", (e) => this.onTouchMove(e));
+    window.removeEventListener("touchend", (e) => this.onTouchEnd(e));
   }
 
   private onKeyDown(e: KeyboardEvent) {
@@ -79,7 +79,7 @@ export class InputManager {
   }
 
   private onTouchEnd(e: TouchEvent) {
-    this.touch.onTouchEnd(e);
+    this.touch.onTouchEnd(e, this.canvas);
   }
 
   setPlayerPos(pos: Vec2) {

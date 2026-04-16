@@ -1,6 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { InputManager } from "./controls/InputManager";
-import { VirtualJoystick } from "./controls/VirtualJoystick";
 import { GameInput } from "./controls/types";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -25,6 +24,8 @@ interface GameState {
 
 const CANVAS_W = 960;
 const CANVAS_H = 640;
+const MOBILE_CANVAS_W = 960;  // Wide on mobile
+const MOBILE_CANVAS_H = 540;  // Shorter height for mobile (16:9 aspect ratio)
 const BULLET_SPEED = 6;
 const BULLET_DAMAGE = 12;
 const AI_REACTION = 0.02;
@@ -70,8 +71,8 @@ function generateObstacles(): Obstacle[] {
 function makeTank(x: number, y: number, color: string, trackColor: string): Tank {
   return {
     pos: { x, y }, vel: { x: 0, y: 0 }, angle: 0, turretAngle: 0,
-    hp: 100, maxHp: 100, speed: 3, rotSpeed: 0.045,
-    accel: 0.15, friction: 0.92,
+    hp: 100, maxHp: 100, speed: 5, rotSpeed: 0.08,
+    accel: 0.25, friction: 0.88,
     cooldown: 0, maxCooldown: 25, color, trackColor,
     width: 36, height: 28,
   };
@@ -159,12 +160,8 @@ export default function TankGame() {
   const inputManagerRef = useRef<InputManager | null>(null);
   const hasFiredRef = useRef(false);
   const rafRef = useRef<number>(0);
-  const [score, setScore] = useState(0);
-  const [playerHp, setPlayerHp] = useState(100);
-  const [aiHp, setAiHp] = useState(100);
-  const [gameOver, setGameOver] = useState(false);
-  const [winner, setWinner] = useState("");
-  const [joystickState, setJoystickState] = useState({
+  // Real-time state refs for draw function (avoids stale state)
+  const joystickStateRef = useRef({
     isActive: false,
     centerX: 0,
     centerY: 0,
@@ -172,11 +169,43 @@ export default function TankGame() {
     currentY: 0,
     radius: 50,
   });
-  const [aimState, setAimState] = useState({ isActive: false, x: 0, y: 0 });
+  const aimStateRef = useRef({ isActive: false, x: 0, y: 0 });
+  const [score, setScore] = useState(0);
+  const [playerHp, setPlayerHp] = useState(100);
+  const [aiHp, setAiHp] = useState(100);
+  const [gameOver, setGameOver] = useState(false);
+  const [winner, setWinner] = useState("");
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === "undefined") return false;
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    // Check screen size instead of user agent for better DevTools mobile emulation support
+    return window.innerWidth < 768;
   });
+
+  // Ref to track active canvas dimensions
+  const canvasDimsRef = useRef({ w: CANVAS_W, h: CANVAS_H });
+
+  // Helper to get canvas dimensions
+  const getCanvasDimensions = useCallback(() => {
+    if (isMobile) {
+      return { w: MOBILE_CANVAS_W, h: MOBILE_CANVAS_H };
+    }
+    return { w: CANVAS_W, h: CANVAS_H };
+  }, [isMobile]);
+
+  // Handle window resize to update mobile state
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Update canvas dimensions ref when isMobile changes
+  useEffect(() => {
+    canvasDimsRef.current = getCanvasDimensions();
+  }, [isMobile, getCanvasDimensions]);
 
   const restart = useCallback(() => {
     stateRef.current = initState();
@@ -216,13 +245,28 @@ export default function TankGame() {
         updateBullets(S);
         updateParticles(S);
         setScore(S.score);
-        setPlayerHp(S.player.hp);
-        setAiHp(S.ai.hp);
+         setPlayerHp(S.player.hp);
+         setAiHp(S.ai.hp);
 
-        // Update joystick and aim state for rendering
-        const touchInput = inputManager.getTouch();
-        setJoystickState({ ...touchInput.getJoystickState() });
-        setAimState({ ...touchInput.getAimState() });
+         // Update joystick and aim state refs for real-time rendering
+         const touchInput = inputManager.getTouch();
+         const js = touchInput.getJoystickState();
+         const as = touchInput.getAimState();
+         
+         // Update refs directly (no React state batching delay)
+         joystickStateRef.current = {
+           isActive: js.isActive,
+           centerX: js.centerX,
+           centerY: js.centerY,
+           currentX: js.currentX,
+           currentY: js.currentY,
+           radius: js.radius,
+         };
+         aimStateRef.current = {
+           isActive: as.isActive,
+           x: as.x,
+           y: as.y,
+         };
 
         if (S.gameOver) {
           setGameOver(true);
@@ -274,9 +318,10 @@ export default function TankGame() {
 
     const nx = p.pos.x + p.vel.x;
     const ny = p.pos.y + p.vel.y;
+    const dims = canvasDimsRef.current;
     if (!collidesObstacles(nx, ny, p.width, p.height, S.obstacles)) {
-      p.pos.x = clamp(nx, p.width / 2, CANVAS_W - p.width / 2);
-      p.pos.y = clamp(ny, p.height / 2, CANVAS_H - p.height / 2);
+      p.pos.x = clamp(nx, p.width / 2, dims.w - p.width / 2);
+      p.pos.y = clamp(ny, p.height / 2, dims.h - p.height / 2);
     } else {
       p.vel.x *= -0.3;
       p.vel.y *= -0.3;
@@ -316,28 +361,29 @@ export default function TankGame() {
 
     // strafe
     const strafeAngle = ai.angle + Math.PI / 2;
-    const strafe = Math.sin(Date.now() * 0.0015) * 0.8;
+     const strafe = Math.sin(Date.now() * 0.0015) * 0.8;
 
-    const nx = ai.pos.x + Math.cos(ai.angle) * move * ai.speed * 0.8 + Math.cos(strafeAngle) * strafe;
-    const ny = ai.pos.y + Math.sin(ai.angle) * move * ai.speed * 0.8 + Math.sin(strafeAngle) * strafe;
-    if (!collidesObstacles(nx, ny, ai.width, ai.height, S.obstacles)) {
-      ai.pos.x = clamp(nx, ai.width / 2, CANVAS_W - ai.width / 2);
-      ai.pos.y = clamp(ny, ai.height / 2, CANVAS_H - ai.height / 2);
-    }
+     const nx = ai.pos.x + Math.cos(ai.angle) * move * ai.speed * 0.8 + Math.cos(strafeAngle) * strafe;
+     const ny = ai.pos.y + Math.sin(ai.angle) * move * ai.speed * 0.8 + Math.sin(strafeAngle) * strafe;
+     const dims = canvasDimsRef.current;
+     if (!collidesObstacles(nx, ny, ai.width, ai.height, S.obstacles)) {
+       ai.pos.x = clamp(nx, ai.width / 2, dims.w - ai.width / 2);
+       ai.pos.y = clamp(ny, ai.height / 2, dims.h - ai.height / 2);
+     }
 
-    // dodge bullets
-    for (const b of S.bullets) {
-      if (b.owner === "ai") continue;
-      if (dist(b.pos, ai.pos) < 100) {
-        const dodge = angleTo(b.pos, ai.pos) + Math.PI / 2;
-        const dx = Math.cos(dodge) * 2;
-        const dy = Math.sin(dodge) * 2;
-        if (!collidesObstacles(ai.pos.x + dx, ai.pos.y + dy, ai.width, ai.height, S.obstacles)) {
-          ai.pos.x = clamp(ai.pos.x + dx, ai.width / 2, CANVAS_W - ai.width / 2);
-          ai.pos.y = clamp(ai.pos.y + dy, ai.height / 2, CANVAS_H - ai.height / 2);
-        }
-      }
-    }
+     // dodge bullets
+     for (const b of S.bullets) {
+       if (b.owner === "ai") continue;
+       if (dist(b.pos, ai.pos) < 100) {
+         const dodge = angleTo(b.pos, ai.pos) + Math.PI / 2;
+         const dx = Math.cos(dodge) * 2;
+         const dy = Math.sin(dodge) * 2;
+         if (!collidesObstacles(ai.pos.x + dx, ai.pos.y + dy, ai.width, ai.height, S.obstacles)) {
+           ai.pos.x = clamp(ai.pos.x + dx, ai.width / 2, dims.w - ai.width / 2);
+           ai.pos.y = clamp(ai.pos.y + dy, ai.height / 2, dims.h - ai.height / 2);
+         }
+       }
+     }
 
     ai.cooldown = Math.max(0, ai.cooldown - 1);
     if (ai.cooldown === 0 && d < 500 && hasFiredRef.current) {
@@ -391,14 +437,15 @@ export default function TankGame() {
   function updateBullets(S: GameState) {
     for (let i = S.bullets.length - 1; i >= 0; i--) {
       const b = S.bullets[i];
-      b.pos.x += b.vel.x;
-      b.pos.y += b.vel.y;
-      b.life--;
+       b.pos.x += b.vel.x;
+       b.pos.y += b.vel.y;
+       b.life--;
 
-      // out of bounds
-      if (b.pos.x < 0 || b.pos.x > CANVAS_W || b.pos.y < 0 || b.pos.y > CANVAS_H || b.life <= 0) {
-        S.bullets.splice(i, 1); continue;
-      }
+       // out of bounds
+       const dims = canvasDimsRef.current;
+       if (b.pos.x < 0 || b.pos.x > dims.w || b.pos.y < 0 || b.pos.y > dims.h || b.life <= 0) {
+         S.bullets.splice(i, 1); continue;
+       }
 
       // obstacle collision
       let hitObs = false;
@@ -463,6 +510,7 @@ export default function TankGame() {
 
   // ── Drawing ──────────────────────────────────────────────────────
   function draw(ctx: CanvasRenderingContext2D, S: GameState) {
+    const dims = canvasDimsRef.current;
     ctx.save();
     // screen shake during explosions
     if (S.explosions.length > 0) {
@@ -471,16 +519,16 @@ export default function TankGame() {
     }
     // ground
     ctx.fillStyle = "#1e2b1e";
-    ctx.fillRect(-10, -10, CANVAS_W + 20, CANVAS_H + 20);
+    ctx.fillRect(-10, -10, dims.w + 20, dims.h + 20);
 
     // ground texture (subtle grid)
     ctx.strokeStyle = "rgba(255,255,255,0.03)";
     ctx.lineWidth = 1;
-    for (let x = 0; x < CANVAS_W; x += 40) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CANVAS_H); ctx.stroke();
+    for (let x = 0; x < dims.w; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, dims.h); ctx.stroke();
     }
-    for (let y = 0; y < CANVAS_H; y += 40) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_W, y); ctx.stroke();
+    for (let y = 0; y < dims.h; y += 40) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(dims.w, y); ctx.stroke();
     }
 
     // obstacles
@@ -548,7 +596,103 @@ export default function TankGame() {
     // tanks
     drawTank(ctx, S.player);
     drawTank(ctx, S.ai);
+
+    // Draw joystick UI on mobile
+    if (isMobile) {
+      drawJoystickUI(ctx);
+    }
+
     ctx.restore();
+  }
+
+  function drawJoystickUI(ctx: CanvasRenderingContext2D) {
+    const margin = 15;
+    const joystickRadius = 70;
+    const centerX = margin + joystickRadius;
+    const canvasHeight = canvasDimsRef.current.h;
+    const canvasWidth = canvasDimsRef.current.w;
+    const centerY = canvasHeight - margin - joystickRadius;
+    
+    // Get joystick state from ref (real-time, not stale)
+    const js = joystickStateRef.current;
+
+    // Background circle
+    ctx.fillStyle = "rgba(100, 200, 255, 0.15)";
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, joystickRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = "rgba(100, 200, 255, 0.5)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, joystickRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Thumb - show current joystick position
+    if (js.isActive) {
+      const thumbRadius = joystickRadius * 0.35;
+      // Calculate movement from center
+      const relX = js.currentX - js.centerX;
+      const relY = js.currentY - js.centerY;
+      const dist = Math.hypot(relX, relY);
+      
+      // Constrain to joystick radius
+      const maxDist = Math.min(dist, joystickRadius * 0.6);
+      
+      // Calculate thumb position
+      const thumbX = centerX + (relX / (dist || 1)) * maxDist;
+      const thumbY = centerY + (relY / (dist || 1)) * maxDist;
+
+      // Thumb fill
+      ctx.fillStyle = "rgba(100, 200, 255, 0.8)";
+      ctx.beginPath();
+      ctx.arc(thumbX, thumbY, thumbRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Thumb border
+      ctx.strokeStyle = "rgba(150, 220, 255, 1)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(thumbX, thumbY, thumbRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Line from center to thumb
+      ctx.strokeStyle = "rgba(100, 200, 255, 0.6)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.lineTo(thumbX, thumbY);
+      ctx.stroke();
+    } else {
+      // Center dot when inactive
+      ctx.fillStyle = "rgba(100, 200, 255, 0.5)";
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Fire hint on right side
+    ctx.fillStyle = "rgba(255, 100, 100, 0.1)";
+    const fireHintRadius = 40;
+    const fireHintX = canvasWidth - 50;
+    const fireHintY = canvasHeight - 50;
+    ctx.beginPath();
+    ctx.arc(fireHintX, fireHintY, fireHintRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255, 100, 100, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(fireHintX, fireHintY, fireHintRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(255, 100, 100, 0.4)";
+    ctx.font = "10px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("TAP TO", fireHintX, fireHintY - 6);
+    ctx.fillText("FIRE", fireHintX, fireHintY + 6);
   }
 
   function drawTank(ctx: CanvasRenderingContext2D, t: Tank) {
@@ -622,12 +766,11 @@ export default function TankGame() {
       <div className="relative rounded border border-border overflow-hidden shadow-lg shadow-black/40">
         <canvas
           ref={canvasRef}
-          width={CANVAS_W}
-          height={CANVAS_H}
-          className="block cursor-crosshair"
+          width={isMobile ? MOBILE_CANVAS_W : CANVAS_W}
+          height={isMobile ? MOBILE_CANVAS_H : CANVAS_H}
+          className="block cursor-crosshair touch-none"
           style={{ maxWidth: "100%", height: "auto" }}
         />
-        <VirtualJoystick canvasRef={canvasRef} joystickState={joystickState} aimState={aimState} />
         {gameOver && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
             {winner === "You Win!" && <Confetti />}

@@ -25,3 +25,11 @@ export interface TouchAimState {
   x: number;
   y: number;
 }
+
+export interface TouchFireButtonState {
+  isActive: boolean;
+  x: number;
+  y: number;
+  pressed: boolean;
+  radius: number;
+}

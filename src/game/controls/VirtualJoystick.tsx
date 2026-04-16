@@ -7,113 +7,131 @@ interface VirtualJoystickProps {
   aimState: TouchAimState;
 }
 
+const JOYSTICK_SIZE = 120; // Diameter of the joystick
+
 export const VirtualJoystick = React.memo(
   ({ canvasRef, joystickState, aimState }: VirtualJoystickProps) => {
     const overlayRef = useRef<HTMLCanvasElement>(null);
 
+    // Draw the fixed joystick at bottom-left of canvas
     useEffect(() => {
       const overlay = overlayRef.current;
-      if (!overlay) return;
+      if (!overlay) {
+        console.log("[VirtualJoystick] No overlay ref");
+        return;
+      }
 
       const mainCanvas = canvasRef.current;
-      if (!mainCanvas) return;
+      if (!mainCanvas) {
+        console.log("[VirtualJoystick] No main canvas ref");
+        return;
+      }
+
+      console.log("[VirtualJoystick] Drawing joystick", {
+        mainCanvasWidth: mainCanvas.width,
+        mainCanvasHeight: mainCanvas.height,
+      });
 
       // Mirror main canvas dimensions
       overlay.width = mainCanvas.width;
       overlay.height = mainCanvas.height;
 
       const ctx = overlay.getContext("2d");
-      if (!ctx) return;
+      if (!ctx) {
+        console.log("[VirtualJoystick] Could not get 2D context");
+        return;
+      }
 
-      // Clear overlay
+      // Clear canvas
       ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-      // Draw joystick (left side)
+      // Joystick position (bottom-left)
+      const margin = 15;
+      const joystickRadius = JOYSTICK_SIZE / 2 - 5;
+      const centerX = margin + joystickRadius + 5;
+      const centerY = overlay.height - margin - joystickRadius - 5;
+
+      // Background circle
+      ctx.fillStyle = "rgba(100, 200, 255, 0.15)";
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, joystickRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Border
+      ctx.strokeStyle = "rgba(100, 200, 255, 0.5)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, joystickRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Thumb - show current joystick position
       if (joystickState.isActive) {
-        const radius = joystickState.radius;
-        const centerX = joystickState.centerX;
-        const centerY = joystickState.centerY;
-        const currentX = joystickState.currentX;
-        const currentY = joystickState.currentY;
+        const thumbRadius = joystickRadius * 0.35;
 
-        // Background circle
-        ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-        ctx.fill();
+        // Calculate relative position within this fixed joystick
+        const relX = joystickState.currentX - joystickState.centerX;
+        const relY = joystickState.currentY - joystickState.centerY;
+        const dist = Math.hypot(relX, relY);
+        const maxDist = Math.min(dist, joystickRadius * 0.7);
 
-        // Joystick border
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-        ctx.stroke();
+        const thumbX = centerX + (relX / (dist || 1)) * maxDist;
+        const thumbY = centerY + (relY / (dist || 1)) * maxDist;
 
-        // Joystick thumb
-        const thumbRadius = radius * 0.4;
-        ctx.fillStyle = "rgba(100, 200, 255, 0.6)";
+        // Thumb fill
+        ctx.fillStyle = "rgba(100, 200, 255, 0.8)";
         ctx.beginPath();
-        ctx.arc(currentX, currentY, thumbRadius, 0, Math.PI * 2);
+        ctx.arc(thumbX, thumbY, thumbRadius, 0, Math.PI * 2);
         ctx.fill();
 
         // Thumb border
-        ctx.strokeStyle = "rgba(100, 200, 255, 0.9)";
+        ctx.strokeStyle = "rgba(150, 220, 255, 1)";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(currentX, currentY, thumbRadius, 0, Math.PI * 2);
+        ctx.arc(thumbX, thumbY, thumbRadius, 0, Math.PI * 2);
         ctx.stroke();
 
-        // Direction indicator lines
-        ctx.strokeStyle = "rgba(100, 200, 255, 0.4)";
+        // Line from center to thumb
+        ctx.strokeStyle = "rgba(100, 200, 255, 0.6)";
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(centerX, centerY);
-        ctx.lineTo(currentX, currentY);
+        ctx.lineTo(thumbX, thumbY);
         ctx.stroke();
-      }
-
-      // Draw fire zone (right side)
-      if (aimState.isActive) {
-        const fireRadius = 35;
-        const aimX = aimState.x;
-        const aimY = aimState.y;
-
-        // Fire zone background
-        ctx.fillStyle = "rgba(255, 100, 100, 0.1)";
+      } else {
+        // Center dot when inactive
+        ctx.fillStyle = "rgba(100, 200, 255, 0.5)";
         ctx.beginPath();
-        ctx.arc(aimX, aimY, fireRadius, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Fire zone border
-        ctx.strokeStyle = "rgba(255, 100, 100, 0.5)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(aimX, aimY, fireRadius, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Center dot
-        ctx.fillStyle = "rgba(255, 100, 100, 0.8)";
-        ctx.beginPath();
-        ctx.arc(aimX, aimY, 5, 0, Math.PI * 2);
+        ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Draw control hints (only when not active)
-      if (!joystickState.isActive && !aimState.isActive) {
-        ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
-        ctx.font = "12px monospace";
-        ctx.textAlign = "left";
-        ctx.fillText("Left: Move", 10, 25);
+      // Draw fire hint on right side
+      ctx.fillStyle = "rgba(255, 100, 100, 0.1)";
+      const fireHintRadius = 40;
+      const fireHintX = overlay.width - 40 - fireHintRadius;
+      const fireHintY = overlay.height - 40 - fireHintRadius;
+      ctx.beginPath();
+      ctx.arc(fireHintX, fireHintY, fireHintRadius, 0, Math.PI * 2);
+      ctx.fill();
 
-        ctx.textAlign = "right";
-        ctx.fillText("Right: Aim & Fire", overlay.width - 10, 25);
-      }
-    });
+      ctx.strokeStyle = "rgba(255, 100, 100, 0.3)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(fireHintX, fireHintY, fireHintRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = "rgba(255, 100, 100, 0.4)";
+      ctx.font = "10px monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("TAP TO", fireHintX, fireHintY - 6);
+      ctx.fillText("FIRE", fireHintX, fireHintY + 6);
+    }, [joystickState, canvasRef]);
 
     return (
       <canvas
         ref={overlayRef}
-        className="absolute inset-0 cursor-crosshair touch-none"
+        className="absolute inset-0 touch-none pointer-events-none"
         style={{ display: "block" }}
       />
     );
