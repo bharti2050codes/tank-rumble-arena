@@ -24,8 +24,8 @@ interface GameState {
 
 const CANVAS_W = 960;
 const CANVAS_H = 640;
-const MOBILE_CANVAS_W = 960;  // Wide on mobile
-const MOBILE_CANVAS_H = 540;  // Shorter height for mobile (16:9 aspect ratio)
+const MOBILE_CANVAS_W = 540;  // Portrait width on mobile
+const MOBILE_CANVAS_H = 960;  // Portrait height on mobile (9:16 aspect ratio)
 const BULLET_SPEED = 6;
 const BULLET_DAMAGE = 12;
 const AI_REACTION = 0.02;
@@ -52,37 +52,38 @@ function spawnParticles(particles: Particle[], pos: Vec2, color: string, count: 
   }
 }
 
-function generateObstacles(): Obstacle[] {
+function generateObstacles(canvasW: number = CANVAS_W, canvasH: number = CANVAS_H): Obstacle[] {
   const obs: Obstacle[] = [];
   const count = 12 + Math.floor(Math.random() * 6);
   for (let i = 0; i < count; i++) {
     const w = rng(30, 80);
     const h = rng(30, 80);
-    const x = rng(60, CANVAS_W - 60 - w);
-    const y = rng(60, CANVAS_H - 60 - h);
+    const x = rng(60, canvasW - 60 - w);
+    const y = rng(60, canvasH - 60 - h);
     // avoid spawn zones
-    if (dist({ x: x + w / 2, y: y + h / 2 }, { x: 80, y: CANVAS_H / 2 }) < 120) continue;
-    if (dist({ x: x + w / 2, y: y + h / 2 }, { x: CANVAS_W - 80, y: CANVAS_H / 2 }) < 120) continue;
+    if (dist({ x: x + w / 2, y: y + h / 2 }, { x: 60, y: canvasH / 2 }) < 120) continue;
+    if (dist({ x: x + w / 2, y: y + h / 2 }, { x: canvasW - 60, y: canvasH / 2 }) < 120) continue;
     obs.push({ pos: { x, y }, w, h });
   }
   return obs;
 }
 
-function makeTank(x: number, y: number, color: string, trackColor: string): Tank {
+function makeTank(x: number, y: number, color: string, trackColor: string, isMobile: boolean = false): Tank {
   return {
     pos: { x, y }, vel: { x: 0, y: 0 }, angle: 0, turretAngle: 0,
     hp: 100, maxHp: 100, speed: 5, rotSpeed: 0.08,
-    accel: 0.25, friction: 0.88,
+    accel: isMobile ? 0.35 : 0.25,  // Increased acceleration on mobile for better responsiveness
+    friction: 0.88,
     cooldown: 0, maxCooldown: 25, color, trackColor,
     width: 36, height: 28,
   };
 }
 
-function initState(): GameState {
+function initState(canvasW: number = CANVAS_W, canvasH: number = CANVAS_H, isMobileScreen: boolean = false): GameState {
   return {
-    player: makeTank(80, CANVAS_H / 2, "#3a7d44", "#2d5e33"),
-    ai: makeTank(CANVAS_W - 80, CANVAS_H / 2, "#b84040", "#8c3030"),
-    bullets: [], obstacles: generateObstacles(), particles: [], explosions: [],
+    player: makeTank(60, canvasH / 2, "#3a7d44", "#2d5e33", isMobileScreen),
+    ai: makeTank(canvasW - 60, canvasH / 2, "#b84040", "#8c3030", isMobileScreen),
+    bullets: [], obstacles: generateObstacles(canvasW, canvasH), particles: [], explosions: [],
     score: 0, gameOver: false, winner: "", deathTimer: 0,
   };
 }
@@ -156,7 +157,7 @@ function Confetti() {
 // ── Component ──────────────────────────────────────────────────────────
 export default function TankGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stateRef = useRef<GameState>(initState());
+  const stateRef = useRef<GameState | null>(null);
   const inputManagerRef = useRef<InputManager | null>(null);
   const hasFiredRef = useRef(false);
   const rafRef = useRef<number>(0);
@@ -208,7 +209,8 @@ export default function TankGame() {
   }, [isMobile, getCanvasDimensions]);
 
   const restart = useCallback(() => {
-    stateRef.current = initState();
+    const dims = canvasDimsRef.current;
+    stateRef.current = initState(dims.w, dims.h, isMobile);
     hasFiredRef.current = false;
     if (inputManagerRef.current) {
       inputManagerRef.current.setPlayerInteracted(false);
@@ -218,11 +220,17 @@ export default function TankGame() {
     setAiHp(100);
     setGameOver(false);
     setWinner("");
-  }, []);
+  }, [isMobile]);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
+
+    // Initialize game state with correct canvas dimensions
+    if (!stateRef.current) {
+      const dims = canvasDimsRef.current;
+      stateRef.current = initState(dims.w, dims.h, isMobile);
+    }
 
     // Initialize InputManager
     const inputManager = new InputManager(canvas);
@@ -231,7 +239,7 @@ export default function TankGame() {
 
     // ── Game loop ──────────────────────────────────────────────────
     const loop = () => {
-      const S = stateRef.current;
+      const S = stateRef.current!;
 
       // Update input manager with player position for aiming
       inputManager.setPlayerPos(S.player.pos);
@@ -361,29 +369,46 @@ export default function TankGame() {
 
     // strafe
     const strafeAngle = ai.angle + Math.PI / 2;
-     const strafe = Math.sin(Date.now() * 0.0015) * 0.8;
+    const strafe = Math.sin(Date.now() * 0.0015) * 0.8;
 
-     const nx = ai.pos.x + Math.cos(ai.angle) * move * ai.speed * 0.8 + Math.cos(strafeAngle) * strafe;
-     const ny = ai.pos.y + Math.sin(ai.angle) * move * ai.speed * 0.8 + Math.sin(strafeAngle) * strafe;
-     const dims = canvasDimsRef.current;
-     if (!collidesObstacles(nx, ny, ai.width, ai.height, S.obstacles)) {
-       ai.pos.x = clamp(nx, ai.width / 2, dims.w - ai.width / 2);
-       ai.pos.y = clamp(ny, ai.height / 2, dims.h - ai.height / 2);
-     }
+    const nx = ai.pos.x + Math.cos(ai.angle) * move * ai.speed * 0.8 + Math.cos(strafeAngle) * strafe;
+    const ny = ai.pos.y + Math.sin(ai.angle) * move * ai.speed * 0.8 + Math.sin(strafeAngle) * strafe;
+    const dims = canvasDimsRef.current;
+    if (!collidesObstacles(nx, ny, ai.width, ai.height, S.obstacles)) {
+      ai.pos.x = clamp(nx, ai.width / 2, dims.w - ai.width / 2);
+      ai.pos.y = clamp(ny, ai.height / 2, dims.h - ai.height / 2);
+    }
 
-     // dodge bullets
-     for (const b of S.bullets) {
-       if (b.owner === "ai") continue;
-       if (dist(b.pos, ai.pos) < 100) {
-         const dodge = angleTo(b.pos, ai.pos) + Math.PI / 2;
-         const dx = Math.cos(dodge) * 2;
-         const dy = Math.sin(dodge) * 2;
-         if (!collidesObstacles(ai.pos.x + dx, ai.pos.y + dy, ai.width, ai.height, S.obstacles)) {
-           ai.pos.x = clamp(ai.pos.x + dx, ai.width / 2, dims.w - ai.width / 2);
-           ai.pos.y = clamp(ai.pos.y + dy, ai.height / 2, dims.h - ai.height / 2);
-         }
-       }
-     }
+    // dodge bullets - improved survival
+    let isDodging = false;
+    for (const b of S.bullets) {
+      if (b.owner === "ai") continue;
+      const bulletDist = dist(b.pos, ai.pos);
+      // Detect bullets that are heading toward AI
+      if (bulletDist < 150) {
+        const bulletToAI = angleTo(b.pos, ai.pos);
+        const bulletAngle = Math.atan2(b.vel.y, b.vel.x);
+        const angleDiff = Math.abs(bulletAngle - bulletToAI);
+        
+        // If bullet is heading toward AI, dodge
+        if (angleDiff < Math.PI / 3 || angleDiff > (5 * Math.PI / 3)) {
+          const dodge = angleTo(b.pos, ai.pos) + Math.PI / 2;
+          // Try to dodge perpendicular to bullet
+          for (let attempt = 0; attempt < 3; attempt++) {
+            const dodgeAngle = dodge + (attempt - 1) * Math.PI / 6;
+            const dx = Math.cos(dodgeAngle) * 3;
+            const dy = Math.sin(dodgeAngle) * 3;
+            if (!collidesObstacles(ai.pos.x + dx, ai.pos.y + dy, ai.width, ai.height, S.obstacles)) {
+              ai.pos.x = clamp(ai.pos.x + dx, ai.width / 2, dims.w - ai.width / 2);
+              ai.pos.y = clamp(ai.pos.y + dy, ai.height / 2, dims.h - ai.height / 2);
+              isDodging = true;
+              break;
+            }
+          }
+          if (isDodging) break;
+        }
+      }
+    }
 
     ai.cooldown = Math.max(0, ai.cooldown - 1);
     if (ai.cooldown === 0 && d < 500 && hasFiredRef.current) {
